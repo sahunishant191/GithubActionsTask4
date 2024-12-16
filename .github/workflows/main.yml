@@ -1,0 +1,64 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Run Linter
+      run: npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Run Build
+      run: npm run build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Deploy to Server
+      env:
+        SERVER_IP: ${{ secrets.SERVER_IP }}
+        USERNAME: ${{ secrets.USERNAME }}
+        PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        echo "$PRIVATE_KEY" > private_key
+        chmod 600 private_key
+        scp -i private_key -r dist/* $USERNAME@$SERVER_IP:$DEPLOY_PATH
+        ssh -i private_key $USERNAME@$SERVER_IP "cd $DEPLOY_PATH && npm install --production && pm2 restart all"
